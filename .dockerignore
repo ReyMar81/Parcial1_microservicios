@@ -1,0 +1,20 @@
+# Excluir artefactos pesados y temporales del contexto de build Docker
+.git
+.gitignore
+.gradle/
+**/build/
+!API-Gateway/build/libs/*.jar
+!microservicios/Clientes/build/libs/*.jar
+!microservicios/Productos/build/libs/*.jar
+!microservicios/Ventas/build/libs/*.jar
+**/out/
+**/reports/
+**/tmp/
+**/captures/
+local.properties
+*.iml
+.idea/
+.vscode/
+Dockerfile*
+**/*.apk
+**/*.aab

@@ -1,0 +1,64 @@
+# === Gradle & Build Artifacts ===
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration
+local.properties
+*.keystore
+*.jks
+
+# IDE / Tools
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Logs & Temp
+*.log
+*.tmp
+*.temp
+hs_err_pid*
+
+# Android specific
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Generated
+**/generated/
+
+# Jetpack Compose previews cache
+.compose-cache/
+
+# Kotlin
+kotlin-js-store/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Distribution archives (we can regenerate)
+**/distributions/*.zip
+**/distributions/*.tar
+
+# Docker build context extras
+**/build-cache/
+
+# Node / web (if added later)
+node_modules/
+
+# Ignore shadow / fat jars (regenerate via shadowJar)
+**/*-all.jar
+
+# Reports
+**/reports/
+
+# Misc
+*.orig
+*.rej
+

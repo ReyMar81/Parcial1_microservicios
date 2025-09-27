@@ -1,0 +1,161 @@
+version: "3.9"
+
+services:
+  # Servicio de base de datos para clientes
+  db_clientes:
+    image: postgres:15-alpine
+    container_name: DB-Clientes
+    environment:
+      POSTGRES_DB: clientes
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - clientes_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d clientes"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - net-clientes
+    ports:
+      - "5433:5432"
+
+  # Microservicio de clientes
+  clientes-ms:
+    build:
+      context: ..
+      dockerfile: microservicios/Clientes/Dockerfile
+    container_name: MS-Clientes
+    environment:
+      PORT: 8082
+      DB_URL: jdbc:postgresql://db_clientes:5432/clientes
+      DB_USER: app
+      DB_PASSWORD: app
+    ports:
+      - "8082:8082"
+    depends_on:
+      db_clientes:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - net-clientes
+      - net-edge
+
+  # API Gateway
+  gateway:
+    build:
+      context: ..
+      dockerfile: API-Gateway/Dockerfile
+    container_name: API-Gateway
+    environment:
+      PORT: 8080
+      CLIENTES_MS_URL: http://clientes-ms:8082
+      PRODUCTOS_MS_URL: http://productos-ms:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      - clientes-ms
+      - productos-ms
+    restart: unless-stopped
+    networks:
+      - net-edge
+
+  # Servicio de base de datos para productos
+  db_productos:
+    image: postgres:15-alpine
+    container_name: DB-Productos
+    environment:
+      POSTGRES_DB: productos
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - productos_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d productos"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - net-productos
+    ports:
+      - "5434:5432"
+
+  # Microservicio de productos
+  productos-ms:
+    build:
+      context: ..
+      dockerfile: microservicios/Productos/Dockerfile
+    container_name: MS-Productos
+    environment:
+      PORT: 8081
+      DB_URL: jdbc:postgresql://db_productos:5432/productos
+      DB_USER: app
+      DB_PASSWORD: app
+    ports:
+      - "8081:8081"
+    depends_on:
+      db_productos:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - net-productos
+      - net-edge
+
+  # Servicio de base de datos para ventas
+  # db_ventas:
+  #   image: postgres:15-alpine
+  #   container_name: DB-Ventas
+  #   environment:
+  #     POSTGRES_DB: ventas
+  #     POSTGRES_USER: app
+  #     POSTGRES_PASSWORD: app
+  #   volumes:
+  #     - ventas_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U app -d ventas"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   networks:
+  #     - net-ventas
+  #   ports:
+  #     - "5435:5432"
+
+  # Microservicio de ventas
+  # ventas-ms:
+  #   build:
+  #     context: ..
+  #     dockerfile: microservicios/Ventas/Dockerfile
+  #   container_name: MS-Ventas
+  #   environment:
+  #     PORT: 8083
+  #     DB_URL: jdbc:postgresql://db_ventas:5432/ventas
+  #     DB_USER: app
+  #     DB_PASSWORD: app
+  #     CLIENTES_MS_URL: http://clientes-ms:8082
+  #     PRODUCTOS_MS_URL: http://productos-ms:8081
+  #   ports:
+  #     - "8083:8083"
+  #   depends_on:
+  #     db_ventas:
+  #       condition: service_healthy
+  #     productos-ms:
+  #       condition: service_started
+  #     clientes-ms:
+  #       condition: service_started
+  #   restart: unless-stopped
+  #   networks:
+  #     - net-ventas
+  #     - net-edge
+
+volumes:
+  clientes_data:
+  productos_data:
+  # ventas_data:
+
+networks:
+  net-clientes:
+  net-productos:
+  # net-ventas:
+  net-edge:
