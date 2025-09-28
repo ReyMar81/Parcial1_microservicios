@@ -52,7 +52,12 @@ class Router(private val serviceRegistry: ServiceRegistry) {
         logger.debug("Resolviendo ruta: $path")
 
         return when {
-            path.startsWith("/api/productos") -> routeProductos(path)
+            path.startsWith("/api/productos") -> {
+                val rest = path.removePrefix("/api/productos")
+                val service = serviceRegistry.getService("productos") ?: return null
+                val finalPath = if (rest.isEmpty()) "/productos" else rest
+                RouteResult("${service.url}$finalPath", service.name)
+            }
             path.startsWith("/api/clientes") -> {
                 val rest = path.removePrefix("/api/clientes")
                 val service = serviceRegistry.getService("clientes") ?: return null
@@ -67,32 +72,6 @@ class Router(private val serviceRegistry: ServiceRegistry) {
             }
             else -> null
         }
-    }
-
-    private fun routeProductos(fullPath: String): RouteResult? {
-        // Formatos aceptados:
-        // /api/productos/productos
-        // /api/productos/productos/{id}
-        // /api/productos/categorias
-        // /api/productos/categorias/{id}
-        // /api/productos/catalogos
-        // /api/productos/catalogos/{id}
-        val service = serviceRegistry.getService("productos") ?: return null
-        val withoutPrefix = fullPath.removePrefix("/api/productos") // e.g. "", "/productos", "/categorias/3"
-        val segments = withoutPrefix.split('/').filter { it.isNotBlank() } // lista limpia
-
-        if (segments.isEmpty()) {
-            // Si no se especifica recurso, devolvemos listado de productos por convención
-            return RouteResult("${service.url}/productos", service.name)
-        }
-        val recurso = segments[0]
-        if (recurso !in setOf("productos", "categorias", "catalogos")) {
-            logger.warn("Recurso desconocido bajo /api/productos: $recurso")
-            return null
-        }
-        val tail = if (segments.size > 1) "/" + segments.drop(1).joinToString("/") else ""
-        val target = "${service.url}/$recurso$tail"
-        return RouteResult(target, service.name)
     }
 
     fun isValidRoute(path: String): Boolean = resolveRoute(path) != null || path == "/health"

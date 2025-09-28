@@ -54,7 +54,7 @@ import java.util.concurrent.TimeUnit
 
 // ==================== MODELO ====================
 data class Producto(
-    val codigo: Int? = null,
+    val codigo: Int = 0, // Cambiar de Int? a Int con valor por defecto
     val nombre: String,
     val descripcion: String,
     val imagen: String,
@@ -189,7 +189,7 @@ class ProductosViewModel : ViewModel() {
     //Funcion para guardar o actualizar un producto
     fun guardar(producto: Producto) { viewModelScope.launch {
         _loading.value = true
-        val resultado = if (_productoEdit.value == null) ProductosGatewayService.crear(producto) else ProductosGatewayService.actualizar(_productoEdit.value!!.codigo!!, producto)
+        val resultado = if (_productoEdit.value == null) ProductosGatewayService.crear(producto) else ProductosGatewayService.actualizar(_productoEdit.value!!.codigo, producto)
         if (resultado != null) {
             _productos.value = if (_productoEdit.value == null) _productos.value + resultado else _productos.value.map { if (it.codigo == resultado.codigo) resultado else it }
             cerrarFormulario()
@@ -199,7 +199,7 @@ class ProductosViewModel : ViewModel() {
 
     fun eliminar(producto: Producto) { viewModelScope.launch {
         _loading.value = true
-        if (producto.codigo != null && ProductosGatewayService.eliminar(producto.codigo)) {
+        if (ProductosGatewayService.eliminar(producto.codigo)) {
             _productos.value = _productos.value.filter { it.codigo != producto.codigo }
         }
         _loading.value = false
@@ -232,7 +232,7 @@ fun ProductosScreen(viewModel: ProductosViewModel = viewModel()) {
                 loading && productos.isEmpty() -> LoadingCard("Cargando productos...")
                 productos.isEmpty() -> EmptyCard("No hay productos", "Pulsa 'Nuevo' para crear el primero", Icons.Default.Inventory2)
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(productos, key = { it.codigo ?: 0 }) { prod -> ProductoCard(prod, categorias, onEditar = { viewModel.mostrarEditar(prod) }, onEliminar = { viewModel.eliminar(prod) }) }
+                    items(productos, key = { it.codigo }) { prod -> ProductoCard(prod, categorias, onEditar = { viewModel.mostrarEditar(prod) }, onEliminar = { viewModel.eliminar(prod) }) }
                 }
             }
             if (loading && productos.isNotEmpty()) { Spacer(Modifier.height(16.dp)); LinearProgressIndicator(Modifier.fillMaxWidth()) }
@@ -586,7 +586,7 @@ fun ProductoFormularioScreen(viewModel: ProductosViewModel) {
                         if (valido && categoriaSeleccionada != null) {
                             viewModel.guardar(
                                 Producto(
-                                    codigo = productoEdit?.codigo,
+                                    codigo = productoEdit?.codigo ?: 0, // Usar 0 para productos nuevos
                                     nombre = nombre,
                                     descripcion = descripcion,
                                     imagen = imagen,

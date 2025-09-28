@@ -29,28 +29,6 @@ class CategoriasData(private val dataSource: DataSource) {
         }
         return lista
     }
-    fun obtenerCategoria(id: Int): Categoria? {
-        val sql = "SELECT id, nombre FROM categorias WHERE id = ?"
-        dataSource.connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setInt(1, id)
-                val rs = stmt.executeQuery()
-                if (rs.next()) return Categoria(rs.getInt("id"), rs.getString("nombre"))
-            }
-        }
-        return null
-    }
-    fun obtenerCategoriaPorNombre(nombre: String): Categoria? {
-        val sql = "SELECT id, nombre FROM categorias WHERE LOWER(nombre)=LOWER(?)"
-        dataSource.connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, nombre)
-                val rs = stmt.executeQuery()
-                if (rs.next()) return Categoria(rs.getInt("id"), rs.getString("nombre"))
-            }
-        }
-        return null
-    }
     fun actualizarCategoria(id: Int, nombre: String): Categoria? {
         val sql = "UPDATE categorias SET nombre = ? WHERE id = ? RETURNING id, nombre"
         dataSource.connection.use { conn ->
@@ -73,7 +51,7 @@ class CategoriasData(private val dataSource: DataSource) {
         }
     }
 }
-
+// Data para Productos
 class ProductosData(private val dataSource: DataSource) {
     fun crearProducto(nombre: String, descripcion: String, imagen: String, precio: Double, stock: Int, categoriaId: Int): Producto {
         val sql = """
@@ -225,4 +203,59 @@ class CatalogosData(private val dataSource: DataSource) {
             }
         }
     }
+
+    // ================== Asociación catálogo-productos ==================
+    fun listarProductosDeCatalogo(catalogoId: Int): List<Producto> {
+        val sql = """
+            SELECT p.codigo, p.nombre, p.descripcion, p.imagen, p.precio, p.stock, p.categoria_id
+            FROM catalogo_producto cp
+            JOIN productos p ON p.codigo = cp.producto_id
+            WHERE cp.catalogo_id = ?
+            ORDER BY p.codigo DESC
+        """.trimIndent()
+        val lista = mutableListOf<Producto>()
+        dataSource.connection.use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setInt(1, catalogoId)
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    lista.add(
+                        Producto(
+                            rs.getInt("codigo"),
+                            rs.getString("nombre"),
+                            rs.getString("descripcion"),
+                            rs.getString("imagen"),
+                            rs.getDouble("precio"),
+                            rs.getInt("stock"),
+                            rs.getInt("categoria_id")
+                        )
+                    )
+                }
+            }
+        }
+        return lista
+    }
+
+    // ================== PRIMITIVAS catálogo-productos ==================
+    fun insertarVinculoCatalogoProducto(conn: java.sql.Connection, catalogoId: Int, productoId: Int) {
+        conn.prepareStatement("INSERT INTO catalogo_producto (catalogo_id, producto_id) VALUES (?, ?) ON CONFLICT DO NOTHING").use { st ->
+            st.setInt(1, catalogoId)
+            st.setInt(2, productoId)
+            st.executeUpdate()
+        }
+    }
+    fun eliminarVinculosDeCatalogo(conn: java.sql.Connection, catalogoId: Int) {
+        conn.prepareStatement("DELETE FROM catalogo_producto WHERE catalogo_id = ?").use { st ->
+            st.setInt(1, catalogoId)
+            st.executeUpdate()
+        }
+    }
+    fun eliminarVinculoIndividual(conn: java.sql.Connection, catalogoId: Int, productoId: Int): Boolean {
+        conn.prepareStatement("DELETE FROM catalogo_producto WHERE catalogo_id = ? AND producto_id = ?").use { st ->
+            st.setInt(1, catalogoId)
+            st.setInt(2, productoId)
+            return st.executeUpdate() > 0
+        }
+    }
+    fun obtenerDataSource(): DataSource = dataSource
 }

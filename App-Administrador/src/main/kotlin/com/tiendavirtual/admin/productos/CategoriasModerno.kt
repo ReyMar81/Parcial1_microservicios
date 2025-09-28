@@ -308,6 +308,5 @@ fun CategoriaFormularioScreen(viewModel: CategoriasViewModel) {
     }
 }
 
-// Wrapper para compatibilidad con navegación previa
 @Composable
 fun CategoriasModerno() { CategoriasScreen() }

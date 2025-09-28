@@ -20,7 +20,7 @@ import com.tiendavirtual.admin.ui.main.MainScreen
 import com.tiendavirtual.admin.clientes.ClientesScreen
 import com.tiendavirtual.admin.productos.CategoriasModerno
 import com.tiendavirtual.admin.productos.ProductosModerno
-import com.tiendavirtual.admin.productos.CatalogosModerno
+import com.tiendavirtual.admin.productos.CatalogosScreen
 
 /**
  * Navegación
@@ -61,7 +61,7 @@ fun AppNavigation() {
 
         // Catálogos
         composable("catalogos") {
-            CatalogosModerno()
+            CatalogosScreen()
         }
 
         // Placeholder para ventas
@@ -73,9 +73,6 @@ fun AppNavigation() {
     }
 }
 
-/**
- * Pantalla placeholder
- */
 @Composable
 fun PlaceholderScreen(
     title: String,
