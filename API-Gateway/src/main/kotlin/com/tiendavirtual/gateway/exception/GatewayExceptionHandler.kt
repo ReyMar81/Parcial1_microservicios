@@ -51,28 +51,6 @@ class GatewayExceptionHandler {
         sendErrorResponse(exchange, 500, errorResponse)
     }
 
-    fun handleTimeout(exchange: HttpExchange, serviceName: String, path: String) {
-        val errorResponse = ErrorResponse(
-            error = "Timeout comunicándose con $serviceName",
-            code = "SERVICE_TIMEOUT",
-            path = path
-        )
-
-        logger.error("Timeout con $serviceName en $path")
-        sendErrorResponse(exchange, 504, errorResponse)
-    }
-
-    fun handleServiceUnavailable(exchange: HttpExchange, serviceName: String, path: String) {
-        val errorResponse = ErrorResponse(
-            error = "Servicio $serviceName no disponible",
-            code = "SERVICE_UNAVAILABLE",
-            path = path
-        )
-
-        logger.error("Servicio $serviceName no disponible en $path")
-        sendErrorResponse(exchange, 503, errorResponse)
-    }
-
     private fun sendErrorResponse(exchange: HttpExchange, statusCode: Int, errorResponse: ErrorResponse) {
         try {
             val jsonResponse = Json.encodeToString(errorResponse)

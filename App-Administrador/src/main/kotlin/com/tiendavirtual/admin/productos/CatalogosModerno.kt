@@ -172,13 +172,13 @@ class CatalogosViewModel : ViewModel() {
     private val _catalogoEdit = MutableStateFlow<Catalogo?>(null)
     val catalogoEdit: StateFlow<Catalogo?> = _catalogoEdit.asStateFlow()
 
-    // Nuevo estado: selección de productos para un catálogo
+    //selección de productos para un catálogo
     private val _catalogoSeleccionado = MutableStateFlow<Catalogo?>(null)
     val catalogoSeleccionado: StateFlow<Catalogo?> = _catalogoSeleccionado.asStateFlow()
     private val _mostrarSeleccionProductos = MutableStateFlow(false)
     val mostrarSeleccionProductos: StateFlow<Boolean> = _mostrarSeleccionProductos.asStateFlow()
 
-    // Estados para gestión de productos en catálogo
+    //gestión de productos en catálogo
     private val _productosDisponibles = MutableStateFlow<List<Producto>>(emptyList())
     val productosDisponibles: StateFlow<List<Producto>> = _productosDisponibles.asStateFlow()
 
@@ -415,7 +415,7 @@ private fun VistaProductosCatalogoScreen(viewModel: CatalogosViewModel, catalogo
 
         Spacer(Modifier.height(16.dp))
 
-        // Estadísticas
+        // Cantidad de productos
         Card(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
@@ -465,7 +465,6 @@ private fun ProductoEnCatalogoCard(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Imagen del producto
             if (producto.imagen.isNotEmpty()) {
                 ProductImage(
                     base64Image = producto.imagen,
@@ -482,14 +481,12 @@ private fun ProductoEnCatalogoCard(
 
             Spacer(Modifier.width(12.dp))
 
-            // Info del producto
             Column(Modifier.weight(1f)) {
                 Text(producto.nombre, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text("Stock: ${producto.stock}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("$${producto.precio}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text("Bs. ${producto.precio}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
 
-            // Botón eliminar
             IconButton(onClick = onEliminar) {
                 Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
             }
@@ -503,21 +500,11 @@ private fun SeleccionProductosCatalogoScreen(viewModel: CatalogosViewModel, cata
     val loading by viewModel.loading.collectAsState()
     val productosDisponibles by viewModel.productosDisponibles.collectAsState()
     val productosEnCatalogo by viewModel.productosEnCatalogo.collectAsState()
-
-    // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
     var ultimoAgregados by remember { mutableStateOf(0) }
-
-    // Filtro de búsqueda
     var filtro by remember { mutableStateOf("") }
-
-    // Lista de productos seleccionados localmente
     val seleccionados = remember { mutableStateListOf<Int>() }
-
-    // IDs ya existentes
     val productosYaEnCatalogo = productosEnCatalogo.map { it.codigo }.toSet()
-
-    // Aplicar filtro
     val productosFiltrados = remember(productosDisponibles, filtro) {
         if (filtro.isBlank()) productosDisponibles else productosDisponibles.filter { it.nombre.contains(filtro, ignoreCase = true) }
     }
@@ -544,7 +531,7 @@ private fun SeleccionProductosCatalogoScreen(viewModel: CatalogosViewModel, cata
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Selecciona productos para incorporarlos al catálogo. Los que ya están aparecerán deshabilitados.",
+                "Selecciona productos para incorporarlos al catálogo.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -566,7 +553,6 @@ private fun SeleccionProductosCatalogoScreen(viewModel: CatalogosViewModel, cata
 
             Spacer(Modifier.height(16.dp))
 
-            // Seleccionados resumen pequeño chips
             if (seleccionados.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     items(seleccionados.toList()) { idSel ->
@@ -706,7 +692,7 @@ private fun ProductoSeleccionableCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "$${producto.precio}",
+                    "Bs. ${producto.precio}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (yaEnCatalogo) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
@@ -726,9 +712,7 @@ private fun ProductoSeleccionableCard(
 
 @Composable
 fun ProductImage(base64Image: String, modifier: Modifier = Modifier) {
-    // Verificar si es una imagen Base64 válida
     if (!base64Image.startsWith("data:image/") || !base64Image.contains(",")) {
-        // No es una imagen Base64 válida, mostrar placeholder
         Box(
             modifier = modifier,
             contentAlignment = Alignment.Center
@@ -737,8 +721,6 @@ fun ProductImage(base64Image: String, modifier: Modifier = Modifier) {
         }
         return
     }
-
-    // Decodificar la imagen
     val imageBitmap = remember(base64Image) {
         try {
             val base64Data = base64Image.substringAfter(",")
@@ -750,7 +732,6 @@ fun ProductImage(base64Image: String, modifier: Modifier = Modifier) {
         }
     }
 
-    // Mostrar la imagen o placeholder
     if (imageBitmap != null) {
         Image(
             bitmap = imageBitmap,

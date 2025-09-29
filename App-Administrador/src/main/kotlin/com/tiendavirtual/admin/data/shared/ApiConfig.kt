@@ -12,6 +12,9 @@ object ApiConfig {
     const val PRODUCTOS_URL = PRODUCTOS_PREFIX
     const val CATEGORIAS_URL = "$PRODUCTOS_PREFIX/categorias"
     const val CATALOGOS_URL  = "$PRODUCTOS_PREFIX/catalogos"
+    const val VENTAS_URL = "${GATEWAY_BASE_URL}/ventas"
+    const val CONFIRMAR_VENTA_URL = "$VENTAS_URL/{id}/confirmar"
+    const val ANULAR_VENTA_URL = "$VENTAS_URL/{id}/anular"
 
 
     const val CONNECT_TIMEOUT = 30L

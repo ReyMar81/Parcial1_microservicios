@@ -109,8 +109,8 @@ fun MainScreen(
                 ModuleCard(
                     title = "Ventas",
                     description = "Gestión de ventas y facturas",
-                    icon = Icons.Default.Person,
-                    isEnabled = false,
+                    icon = Icons.Default.ShoppingCart,
+                    isEnabled = true,
                     onClick = onNavigateToVentas
                 )
             }
@@ -164,11 +164,11 @@ fun MainScreen(
                     Column {
                         StatusIndicator(
                             label = "MS Productos",
-                            isOnline = false
+                            isOnline = true
                         )
                         StatusIndicator(
                             label = "MS Ventas",
-                            isOnline = false
+                            isOnline = true
                         )
                     }
                 }

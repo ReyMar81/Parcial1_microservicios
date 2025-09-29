@@ -6,7 +6,6 @@ import com.zaxxer.hikari.HikariDataSource
 import com.tiendavirtual.ventas.api.VentasApi
 import com.tiendavirtual.ventas.negocio.VentaNegocio
 import com.tiendavirtual.ventas.data.VentasData
-import org.flywaydb.core.Flyway
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
 
@@ -32,11 +31,33 @@ fun main() {
     config.maximumPoolSize = 10
     val dataSource = HikariDataSource(config)
 
-    // Ejecutar migraciones
-    val flyway = Flyway.configure()
-        .dataSource(dataSource)
-        .load()
-    flyway.migrate()
+    // Crear tablas si no existen
+    try {
+        dataSource.connection.use { connection ->
+            val createTableSql = """
+                CREATE TABLE IF NOT EXISTS ventas (
+                  id SERIAL PRIMARY KEY,
+                  fecha TIMESTAMP NOT NULL,
+                  estado VARCHAR(30) NOT NULL,
+                  total NUMERIC(12,2) NOT NULL,
+                  cliente_id INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS detalle_venta (
+                  id SERIAL PRIMARY KEY,
+                  cantidad INTEGER NOT NULL,
+                  precio_unitario NUMERIC(12,2) NOT NULL,
+                  producto_id INTEGER NOT NULL,
+                  venta_id INTEGER NOT NULL REFERENCES ventas(id) ON DELETE CASCADE
+                );
+            """.trimIndent()
+            connection.prepareStatement(createTableSql).use { statement ->
+                statement.execute()
+                logger.info("[DB-DEBUG] Tablas de ventas creadas exitosamente")
+            }
+        }
+    } catch (e: Exception) {
+        logger.error("[DB-ERROR] Error creando tablas: ", e)
+    }
 
     // INICIALIZAR LAS 3 CAPAS SEGÚN TU DIAGRAMA
     logger.info("📊 Inicializando capa de Datos...")
@@ -48,27 +69,39 @@ fun main() {
     logger.info("📡 Inicializando capa API...")
     val ventasApi = VentasApi(ventaNegocio)
 
-    // Crear servidor HTTP
+    // Crear servidor HTTP nativo (como Productos)
     val server = HttpServer.create(InetSocketAddress(port), 0)
 
-    // Health check
+    // Configurar endpoints
+    server.createContext("/ventas") { exchange ->
+        // Agregar headers CORS
+        exchange.responseHeaders.add("Access-Control-Allow-Origin", "*")
+        exchange.responseHeaders.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        exchange.responseHeaders.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+        if (exchange.requestMethod == "OPTIONS") {
+            exchange.sendResponseHeaders(200, 0)
+            exchange.responseBody.close()
+        } else {
+            ventasApi.manejarRequest(exchange)
+        }
+    }
+
     server.createContext("/health") { exchange ->
-        exchange.responseHeaders.set("Content-Type", "application/json")
-        val response = """{"status":"ok","service":"ventas-ms","architecture":"3-layers"}"""
+        exchange.responseHeaders.add("Access-Control-Allow-Origin", "*")
+        exchange.responseHeaders.add("Content-Type", "application/json")
+        val response = """{"status":"UP","service":"ventas"}"""
         exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
         exchange.responseBody.write(response.toByteArray())
         exchange.responseBody.close()
     }
 
-    // Delegar todas las peticiones a la capa API
-    server.createContext("/ventas") { exchange ->
-        // Llamar al método correcto definido en VentasApi
-        ventasApi.manejarRequest(exchange)
-    }
-
     server.executor = null
     server.start()
+
     logger.info("✅ Microservicio Ventas iniciado en http://localhost:$port")
     logger.info("📐 Arquitectura: API → Negocio → Datos → BD")
-    logger.info("🔄 Flujo transaccional: Productos ↔ Clientes ↔ Ventas")
+    logger.info("🔄 Endpoints:")
+    logger.info("   POST /ventas/{id}/confirmar - Solo cambia estado a CONFIRMADA")
+    logger.info("   POST /ventas/{id}/anular - Solo cambia estado a ANULADA")
 }

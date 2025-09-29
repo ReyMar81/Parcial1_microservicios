@@ -170,17 +170,7 @@ class CatalogosData(private val dataSource: DataSource) {
         }
         return lista
     }
-    fun obtenerCatalogo(id: Int): Catalogo? {
-        val sql = "SELECT id, nombre, descripcion FROM catalogos WHERE id = ?"
-        dataSource.connection.use { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setInt(1, id)
-                val rs = stmt.executeQuery()
-                if (rs.next()) return Catalogo(rs.getInt("id"), rs.getString("nombre"), rs.getString("descripcion"))
-            }
-        }
-        return null
-    }
+
     fun actualizarCatalogo(id: Int, nombre: String, descripcion: String): Catalogo? {
         val sql = "UPDATE catalogos SET nombre = ?, descripcion = ? WHERE id = ? RETURNING id, nombre, descripcion"
         dataSource.connection.use { conn ->

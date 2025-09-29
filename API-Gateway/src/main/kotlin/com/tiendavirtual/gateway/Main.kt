@@ -14,8 +14,6 @@ import java.net.InetSocketAddress
 private val logger = LoggerFactory.getLogger("APIGateway")
 
 class GatewayService(
-    private val config: GatewayConfig,
-    private val serviceRegistry: ServiceRegistry,
     private val router: Router,
     private val httpProxy: HttpProxy,
     private val healthChecker: HealthChecker,
@@ -112,7 +110,7 @@ fun main() {
     val exceptionHandler = GatewayExceptionHandler()
 
     val gatewayService = GatewayService(
-        config, serviceRegistry, router, httpProxy, healthChecker, exceptionHandler
+        router, httpProxy, healthChecker, exceptionHandler
     )
 
     // Configurar servidor HTTP

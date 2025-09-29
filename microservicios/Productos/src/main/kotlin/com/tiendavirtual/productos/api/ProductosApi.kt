@@ -6,7 +6,6 @@ import com.tiendavirtual.productos.negocio.ProductoNegocio
 import com.tiendavirtual.productos.negocio.CatalogoNegocio
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 
@@ -300,13 +299,6 @@ class ProductosApi(
 
     private fun catalogoExiste(id: Int) = catalogoNegocio.listarCatalogos().any { it.id == id }
 
-    private fun enviarJSON(exchange: HttpExchange, codigo: Int, bodyObj: Any) {
-        val body = json.encodeToString(bodyObj)
-        exchange.responseHeaders.set("Content-Type", "application/json; charset=utf-8")
-        val bytes = body.toByteArray(Charsets.UTF_8)
-        exchange.sendResponseHeaders(codigo, bytes.size.toLong())
-        exchange.responseBody.write(bytes)
-    }
     private fun enviarError(exchange: HttpExchange, codigo: Int, mensaje: String) {
         val body = json.encodeToString(ErrorResponse(mensaje))
         exchange.responseHeaders.set("Content-Type", "application/json; charset=utf-8")

@@ -1,242 +1,384 @@
 package com.tiendavirtual.ventas.negocio
 
 import com.tiendavirtual.ventas.data.VentasData
-import org.slf4j.LoggerFactory
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.time.LocalDateTime
-import java.util.*
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.net.URI
+import kotlinx.serialization.json.Json
 
-private val logger = LoggerFactory.getLogger("VentaNegocio")
+// URLs de microservicios
+private const val CLIENTES_SERVICE_URL = "http://localhost:8082"
+private const val PRODUCTOS_SERVICE_URL = "http://localhost:8081"
 
-/**
- * Entidades de la capa de negocio
- */
+private val httpClient = HttpClient.newBuilder().build()
+private val json = Json { ignoreUnknownKeys = true }
+
+// Estados de venta
+enum class EstadoVenta { CREADA, CONFIRMADA, ANULADA }
+
+// Modelos de dominio (no serializables directamente porque contienen LocalDateTime)
 data class Venta(
     val id: Int,
     val fecha: LocalDateTime,
-    val clienteId: Int,
     val estado: EstadoVenta,
     val total: Double,
+    val clienteId: Int,
     val detalles: List<DetalleVenta> = emptyList()
 )
 
 data class DetalleVenta(
     val id: Int,
-    val ventaId: Int,
-    val productoId: String,
     val cantidad: Int,
-    val precioUnitario: Double
+    val precioUnitario: Double,
+    val productoId: Int,
+    val ventaId: Int
 )
 
-enum class EstadoVenta {
-    CREADA, CONFIRMADA, ANULADA
-}
+// DTOs para comunicación con otros microservicios
+@Serializable
+data class ClienteDto(
+    val id: Int,
+    @SerialName("nombres") val nombres: String,
+    val docIdentidad: String,
+    val whatsapp: String,
+    val direccion: String
+)
 
-/**
- * Capa de Negocio del microservicio Ventas
- * Responsabilidad: Lógica de negocio, validaciones y orquestación de transacciones
- */
+@Serializable
+data class ProductoDto(
+    @SerialName("codigo") val id: Int,
+    val nombre: String,
+    val precio: Double,
+    val stock: Int
+)
+
 class VentaNegocio(private val ventasData: VentasData) {
 
-    /**
-     * Crear nueva venta en estado CREADA
-     */
-    fun crearVenta(clienteId: Int, detalles: List<Pair<String, Int>>): Venta {
-        logger.info("🔧 Negocio: Creando venta para cliente: $clienteId")
+    // ================== CREAR VENTA (TRANSACCIÓN COMPLETA) ==================
 
-        // Validaciones de negocio
-        if (detalles.isEmpty()) {
-            throw IllegalArgumentException("La venta debe tener al menos un producto")
-        }
+    fun crearVenta(clienteId: Int, detalles: List<Pair<Int, Int>>, precios: Map<Int, Double>): Venta {
+        // 1. VALIDAR CLIENTE EXISTE (consulta a microservicio Clientes)
+        val cliente = obtenerCliente(clienteId)
+            ?: throw IllegalArgumentException("Cliente con ID $clienteId no existe")
 
+        // 2. VALIDAR PRODUCTOS EXISTEN Y TIENEN STOCK (consulta a microservicio Productos)
+        val productosValidados = mutableMapOf<Int, ProductoDto>()
         for ((productoId, cantidad) in detalles) {
-            if (cantidad <= 0) {
-                throw IllegalArgumentException("La cantidad debe ser mayor a 0 para producto: $productoId")
+            val producto = obtenerProducto(productoId)
+                ?: throw IllegalArgumentException("Producto con ID $productoId no existe")
+
+            if (producto.stock < cantidad) {
+                throw IllegalArgumentException("Stock insuficiente para producto ${producto.nombre}. Disponible: ${producto.stock}, Requerido: $cantidad")
             }
+
+            productosValidados[productoId] = producto
         }
 
-        // Crear venta en estado CREADA
-        return ventasData.crearVenta(clienteId, detalles)
-    }
-
-    /**
-     * Obtener venta por ID
-     */
-    fun obtenerVenta(id: Int): Venta? {
-        logger.info("🔧 Negocio: Obteniendo venta ID: $id")
-        return ventasData.obtenerVenta(id)
-    }
-
-    /**
-     * Obtener todas las ventas
-     */
-    fun obtenerVentas(): List<Venta> {
-        logger.info("🔧 Negocio: Obteniendo todas las ventas")
-        return ventasData.obtenerVentas()
-    }
-
-    /**
-     * Confirmar venta - Flujo transaccional completo
-     * 1. Validar cliente existe
-     * 2. Reservar stock de productos
-     * 3. Confirmar stock
-     * 4. Calcular total
-     * 5. Cambiar estado a CONFIRMADA
-     */
-    fun confirmarVenta(ventaId: Int): ConfirmacionResult {
-        logger.info("🔧 Negocio: Confirmando venta ID: $ventaId")
-
-        val venta = ventasData.obtenerVenta(ventaId)
-            ?: throw IllegalArgumentException("Venta no encontrada: $ventaId")
-
-        if (venta.estado != EstadoVenta.CREADA) {
-            throw IllegalArgumentException("Solo se pueden confirmar ventas en estado CREADA")
+        // 3. CALCULAR TOTAL
+        var total = 0.0
+        for ((productoId, cantidad) in detalles) {
+            val precioUnitario = precios[productoId] ?: productosValidados[productoId]!!.precio
+            total += cantidad * precioUnitario
         }
 
-        try {
-            // 1. Validar cliente (llamada a microservicio Clientes)
-            val clienteValido = validarCliente(venta.clienteId)
-            if (!clienteValido) {
-                return ConfirmacionResult(false, "Cliente no válido", null)
+        // 4. CREAR VENTA EN TRANSACCIÓN (cabecera + detalles)
+        val dataSource = ventasData.obtenerDataSource()
+        dataSource.connection.use { conn ->
+            try {
+                conn.autoCommit = false // INICIAR TRANSACCIÓN
+
+                // 4.1 Crear cabecera de venta
+                val fecha = LocalDateTime.now()
+                val estado = EstadoVenta.CREADA
+                val ventaData = ventasData.crearVenta(conn, fecha, estado.name, total, clienteId)
+
+                // 4.2 Crear detalles de venta
+                val detallesCreados = mutableListOf<DetalleVenta>()
+                for ((productoId, cantidad) in detalles) {
+                    val precioUnitario = precios[productoId] ?: productosValidados[productoId]!!.precio
+                    val detalleData = ventasData.insertarDetalleVenta(conn, cantidad, precioUnitario, productoId, ventaData.id)
+
+                    detallesCreados.add(DetalleVenta(
+                        id = detalleData.id,
+                        cantidad = detalleData.cantidad,
+                        precioUnitario = detalleData.precioUnitario,
+                        productoId = detalleData.productoId,
+                        ventaId = detalleData.ventaId
+                    ))
+                }
+
+                conn.commit() // CONFIRMAR TRANSACCIÓN
+
+                return Venta(
+                    id = ventaData.id,
+                    fecha = ventaData.fecha,
+                    estado = EstadoVenta.valueOf(ventaData.estado),
+                    total = ventaData.total,
+                    clienteId = ventaData.clienteId,
+                    detalles = detallesCreados
+                )
+
+            } catch (e: Exception) {
+                conn.rollback() // REVERTIR TRANSACCIÓN EN CASO DE ERROR
+                throw RuntimeException("Error creando venta: ${e.message}", e)
+            } finally {
+                conn.autoCommit = true
+            }
+        }
+    }
+
+    // ================== CONFIRMAR VENTA ==================
+
+    fun confirmarVenta(ventaId: Int): Venta? {
+        val dataSource = ventasData.obtenerDataSource()
+        dataSource.connection.use { conn ->
+            try {
+                conn.autoCommit = false
+
+                // Validar que la venta existe y está en estado CREADA
+                val ventaActual = obtenerVenta(ventaId)
+                if (ventaActual == null || ventaActual.estado != EstadoVenta.CREADA) {
+                    return null
+                }
+
+                // Cambiar estado a CONFIRMADA
+                val actualizado = ventasData.actualizarEstadoVenta(conn, ventaId, EstadoVenta.CONFIRMADA.name)
+
+                conn.commit()
+
+                return if (actualizado) {
+                    ventaActual.copy(estado = EstadoVenta.CONFIRMADA)
+                } else null
+
+            } catch (e: Exception) {
+                conn.rollback()
+                throw RuntimeException("Error confirmando venta: ${e.message}", e)
+            } finally {
+                conn.autoCommit = true
+            }
+        }
+    }
+
+    // ================== ANULAR VENTA ==================
+
+    fun anularVenta(ventaId: Int): Venta? {
+        val dataSource = ventasData.obtenerDataSource()
+        dataSource.connection.use { conn ->
+            try {
+                conn.autoCommit = false
+
+                // Validar que la venta existe y está en estado CREADA
+                val ventaActual = obtenerVenta(ventaId)
+                if (ventaActual == null || ventaActual.estado != EstadoVenta.CREADA) {
+                    return null
+                }
+
+                // Cambiar estado a ANULADA
+                val actualizado = ventasData.actualizarEstadoVenta(conn, ventaId, EstadoVenta.ANULADA.name)
+
+                conn.commit()
+
+                return if (actualizado) {
+                    ventaActual.copy(estado = EstadoVenta.ANULADA)
+                } else null
+
+            } catch (e: Exception) {
+                conn.rollback()
+                throw RuntimeException("Error anulando venta: ${e.message}", e)
+            } finally {
+                conn.autoCommit = true
+            }
+        }
+    }
+
+    // ================== OBTENER VENTA COMPLETA ==================
+
+    fun obtenerVenta(ventaId: Int): Venta? {
+        val ventaData = ventasData.obtenerVenta(ventaId) ?: return null
+        val detallesData = ventasData.obtenerDetallesPorVenta(ventaId)
+
+        val detalles = detallesData.map { detalle ->
+            DetalleVenta(
+                id = detalle.id,
+                cantidad = detalle.cantidad,
+                precioUnitario = detalle.precioUnitario,
+                productoId = detalle.productoId,
+                ventaId = detalle.ventaId
+            )
+        }
+
+        return Venta(
+            id = ventaData.id,
+            fecha = ventaData.fecha,
+            estado = EstadoVenta.valueOf(ventaData.estado),
+            total = ventaData.total,
+            clienteId = ventaData.clienteId,
+            detalles = detalles
+        )
+    }
+
+    // ================== LISTAR VENTAS ==================
+
+    fun listarVentas(): List<Venta> {
+        val ventasLista = ventasData.listarVentas()
+        return ventasLista.map { ventaData ->
+            val detalles = this.ventasData.obtenerDetallesPorVenta(ventaData.id).map { detalle ->
+                DetalleVenta(
+                    id = detalle.id,
+                    cantidad = detalle.cantidad,
+                    precioUnitario = detalle.precioUnitario,
+                    productoId = detalle.productoId,
+                    ventaId = detalle.ventaId
+                )
             }
 
-            // 2. Reservar stock (llamada a microservicio Productos)
-            val itemsReserva = venta.detalles.map { it.productoId to it.cantidad }
-            val reservaResult = reservarStock(itemsReserva)
+            Venta(
+                id = ventaData.id,
+                fecha = ventaData.fecha,
+                estado = EstadoVenta.valueOf(ventaData.estado),
+                total = ventaData.total,
+                clienteId = ventaData.clienteId,
+                detalles = detalles
+            )
+        }
+    }
 
-            if (!reservaResult.todosReservados) {
-                return ConfirmacionResult(false, "Stock insuficiente para algunos productos", null)
+    // ================== ACTUALIZAR VENTA ==================
+
+    fun actualizarVenta(ventaId: Int, clienteId: Int, detalles: List<Pair<Int, Int>>, precios: Map<Int, Double>): Venta? {
+        // Validar que la venta existe y está en estado CREADA
+        val ventaActual = obtenerVenta(ventaId)
+        if (ventaActual == null || ventaActual.estado != EstadoVenta.CREADA) {
+            return null
+        }
+
+        // Validar cliente y productos igual que en crear venta
+        val cliente = obtenerCliente(clienteId) ?: return null
+
+        val productosValidados = mutableMapOf<Int, ProductoDto>()
+        for ((productoId, cantidad) in detalles) {
+            val producto = obtenerProducto(productoId) ?: return null
+            if (producto.stock < cantidad) return null
+            productosValidados[productoId] = producto
+        }
+
+        // Calcular nuevo total
+        var total = 0.0
+        for ((productoId, cantidad) in detalles) {
+            val precioUnitario = precios[productoId] ?: productosValidados[productoId]!!.precio
+            total += cantidad * precioUnitario
+        }
+
+        // Actualizar en transacción
+        val dataSource = ventasData.obtenerDataSource()
+        dataSource.connection.use { conn ->
+            try {
+                conn.autoCommit = false
+
+                // Eliminar detalles existentes
+                ventasData.eliminarDetallesPorVenta(conn, ventaId)
+
+                // Actualizar cabecera (cliente y total) manteniendo estado CREADA
+                ventasData.actualizarVentaCabecera(conn, ventaId, clienteId, total)
+
+                // Crear nuevos detalles
+                val detallesCreados = mutableListOf<DetalleVenta>()
+                for ((productoId, cantidad) in detalles) {
+                    val precioUnitario = precios[productoId] ?: productosValidados[productoId]!!.precio
+                    val detalleData = ventasData.insertarDetalleVenta(conn, cantidad, precioUnitario, productoId, ventaId)
+
+                    detallesCreados.add(DetalleVenta(
+                        id = detalleData.id,
+                        cantidad = detalleData.cantidad,
+                        precioUnitario = detalleData.precioUnitario,
+                        productoId = detalleData.productoId,
+                        ventaId = detalleData.ventaId
+                    ))
+                }
+
+                conn.commit()
+
+                return Venta(
+                    id = ventaId,
+                    fecha = ventaActual.fecha,
+                    estado = EstadoVenta.CREADA,
+                    total = total,
+                    clienteId = clienteId,
+                    detalles = detallesCreados
+                )
+
+            } catch (e: Exception) {
+                conn.rollback()
+                throw RuntimeException("Error actualizando venta: ${e.message}", e)
+            } finally {
+                conn.autoCommit = true
             }
+        }
+    }
 
-            // 3. Confirmar stock
-            val stockConfirmado = confirmarStock(reservaResult.reservaId)
-            if (!stockConfirmado) {
-                liberarStock(reservaResult.reservaId)
-                return ConfirmacionResult(false, "Error al confirmar stock", null)
+    // ================== ELIMINAR VENTA ==================
+
+    fun eliminarVenta(ventaId: Int): Boolean {
+        val dataSource = ventasData.obtenerDataSource()
+        dataSource.connection.use { conn ->
+            try {
+                conn.autoCommit = false
+
+                // Eliminar detalles primero (por restricción de clave foránea)
+                ventasData.eliminarDetallesPorVenta(conn, ventaId)
+
+                // Eliminar cabecera
+                val eliminado = ventasData.eliminarVenta(conn, ventaId)
+
+                conn.commit()
+                return eliminado
+
+            } catch (e: Exception) {
+                conn.rollback()
+                throw RuntimeException("Error eliminando venta: ${e.message}", e)
+            } finally {
+                conn.autoCommit = true
             }
+        }
+    }
 
-            // 4. Calcular total y confirmar venta
-            val total = calcularTotal(venta.detalles)
-            val ventaConfirmada = ventasData.confirmarVenta(ventaId, total)
+    // ================== COMUNICACIÓN CON OTROS MICROSERVICIOS ==================
 
-            return if (ventaConfirmada != null) {
-                ConfirmacionResult(true, "Venta confirmada exitosamente", ventaConfirmada)
-            } else {
-                // Si falla, liberar stock
-                liberarStock(reservaResult.reservaId)
-                ConfirmacionResult(false, "Error al confirmar venta", null)
-            }
+    private fun obtenerCliente(clienteId: Int): ClienteDto? {
+        return try {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create("$CLIENTES_SERVICE_URL/clientes/$clienteId"))
+                .GET()
+                .build()
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+
+            if (response.statusCode() == 200) {
+                json.decodeFromString(ClienteDto.serializer(), response.body())
+            } else null
 
         } catch (e: Exception) {
-            logger.error("Error al confirmar venta: ${e.message}", e)
-            return ConfirmacionResult(false, "Error interno: ${e.message}", null)
+            null
         }
     }
 
-    /**
-     * Anular venta - Libera reservas de stock
-     */
-    fun anularVenta(ventaId: Int): Boolean {
-        logger.info("🔧 Negocio: Anulando venta ID: $ventaId")
+    private fun obtenerProducto(productoId: Int): ProductoDto? {
+        return try {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create("$PRODUCTOS_SERVICE_URL/productos/$productoId"))
+                .GET()
+                .build()
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
-        val venta = ventasData.obtenerVenta(ventaId)
-            ?: throw IllegalArgumentException("Venta no encontrada: $ventaId")
+            if (response.statusCode() == 200) {
+                json.decodeFromString(ProductoDto.serializer(), response.body())
+            } else null
 
-        if (venta.estado == EstadoVenta.ANULADA) {
-            throw IllegalArgumentException("La venta ya está anulada")
+        } catch (e: Exception) {
+            null
         }
-
-        // Si la venta estaba confirmada, liberar stock
-        if (venta.estado == EstadoVenta.CONFIRMADA) {
-            val itemsLiberar = venta.detalles.map { it.productoId to it.cantidad }
-            liberarStockConfirmado(itemsLiberar)
-        }
-
-        return ventasData.anularVenta(ventaId)
-    }
-
-    /**
-     * Generar nota de venta en PDF
-     */
-    fun generarNotaVenta(ventaId: Int): ByteArray {
-        logger.info("🔧 Negocio: Generando nota de venta ID: $ventaId")
-
-        val venta = ventasData.obtenerVenta(ventaId)
-            ?: throw IllegalArgumentException("Venta no encontrada: $ventaId")
-
-        if (venta.estado != EstadoVenta.CONFIRMADA) {
-            throw IllegalArgumentException("Solo se puede generar nota de ventas confirmadas")
-        }
-
-        return ventasData.generarNotaVentaPdf(venta)
-    }
-
-    // ==================== MÉTODOS PRIVADOS DE INTEGRACIÓN ====================
-
-    /**
-     * Validar cliente - Integración con microservicio Clientes
-     */
-    private fun validarCliente(clienteId: Int): Boolean {
-        // TODO: Implementar llamada HTTP al microservicio Clientes
-        // Por ahora, simulación
-        logger.info("🔧 Validando cliente ID: $clienteId en microservicio Clientes")
-        return true
-    }
-
-    /**
-     * Reservar stock - Integración con microservicio Productos
-     */
-    private fun reservarStock(items: List<Pair<String, Int>>): ReservaStockResult {
-        // TODO: Implementar llamada HTTP al microservicio Productos
-        // Por ahora, simulación
-        logger.info("🔧 Reservando stock en microservicio Productos")
-        return ReservaStockResult(UUID.randomUUID().toString(), true)
-    }
-
-    /**
-     * Confirmar stock - Integración con microservicio Productos
-     */
-    private fun confirmarStock(reservaId: String): Boolean {
-        // TODO: Implementar llamada HTTP al microservicio Productos
-        logger.info("🔧 Confirmando stock reserva: $reservaId")
-        return true
-    }
-
-    /**
-     * Liberar stock - Integración con microservicio Productos
-     */
-    private fun liberarStock(reservaId: String): Boolean {
-        // TODO: Implementar llamada HTTP al microservicio Productos
-        logger.info("🔧 Liberando stock reserva: $reservaId")
-        return true
-    }
-
-    /**
-     * Liberar stock confirmado - Para ventas anuladas
-     */
-    private fun liberarStockConfirmado(items: List<Pair<String, Int>>): Boolean {
-        // TODO: Implementar llamada HTTP al microservicio Productos
-        logger.info("🔧 Liberando stock confirmado")
-        return true
-    }
-
-    /**
-     * Calcular total de la venta
-     */
-    private fun calcularTotal(detalles: List<DetalleVenta>): Double {
-        return detalles.sumOf { it.cantidad * it.precioUnitario }
     }
 }
-
-/**
- * Clases de respuesta para operaciones complejas
- */
-data class ConfirmacionResult(
-    val exitoso: Boolean,
-    val mensaje: String,
-    val venta: Venta?
-)
-
-data class ReservaStockResult(
-    val reservaId: String,
-    val todosReservados: Boolean
-)

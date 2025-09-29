@@ -21,6 +21,7 @@ import com.tiendavirtual.admin.clientes.ClientesScreen
 import com.tiendavirtual.admin.productos.CategoriasModerno
 import com.tiendavirtual.admin.productos.ProductosModerno
 import com.tiendavirtual.admin.productos.CatalogosScreen
+import com.tiendavirtual.admin.ventas.VentasModuleScreen
 
 /**
  * Navegación
@@ -64,54 +65,9 @@ fun AppNavigation() {
             CatalogosScreen()
         }
 
-        // Placeholder para ventas
+        // Ventas - ahora funcional
         composable("ventas") {
-            PlaceholderScreen("Ventas", "Módulo en desarrollo") {
-                navController.popBackStack()
-            }
-        }
-    }
-}
-
-@Composable
-fun PlaceholderScreen(
-    title: String,
-    message: String,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Settings,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = onBack) {
-            Text("Volver al Menú Principal")
+            VentasModuleScreen()
         }
     }
 }

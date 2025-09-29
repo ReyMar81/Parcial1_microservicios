@@ -8,7 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,12 +48,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 // ==================== MODELO ====================
 data class Producto(
-    val codigo: Int = 0, // Cambiar de Int? a Int con valor por defecto
+    val codigo: Int = 0,
     val nombre: String,
     val descripcion: String,
     val imagen: String,
@@ -145,8 +143,8 @@ class ProductosViewModel : ViewModel() {
     val productoEdit: StateFlow<Producto?> = _productoEdit.asStateFlow()
 
     // Estado para las categorías del dropdown
-    private val _categorias = MutableStateFlow<List<com.tiendavirtual.admin.productos.Categoria>>(emptyList())
-    val categorias: StateFlow<List<com.tiendavirtual.admin.productos.Categoria>> = _categorias.asStateFlow()
+    private val _categorias = MutableStateFlow<List<Categoria>>(emptyList())
+    val categorias: StateFlow<List<Categoria>> = _categorias.asStateFlow()
 
     private val _loadingCategorias = MutableStateFlow(false)
     val loadingCategorias: StateFlow<Boolean> = _loadingCategorias.asStateFlow()
@@ -167,7 +165,7 @@ class ProductosViewModel : ViewModel() {
     fun cargarCategorias() {
         viewModelScope.launch {
             _loadingCategorias.value = true
-            _categorias.value = com.tiendavirtual.admin.productos.CategoriasGatewayService.listar()
+            _categorias.value = CategoriasGatewayService.listar()
             _loadingCategorias.value = false
         }
     }
@@ -175,13 +173,13 @@ class ProductosViewModel : ViewModel() {
     fun mostrarNuevo() {
         _productoEdit.value = null
         _mostrarFormulario.value = true
-        cargarCategorias() // Cargar categorías cuando se abre el formulario
+        cargarCategorias()
     }
 
     fun mostrarEditar(p: Producto) {
         _productoEdit.value = p
         _mostrarFormulario.value = true
-        cargarCategorias() // Cargar categorías cuando se abre el formulario
+        cargarCategorias()
     }
 
     fun cerrarFormulario() { _mostrarFormulario.value = false; _productoEdit.value = null }
@@ -245,7 +243,7 @@ private fun esImagenBase64(s: String) = s.startsWith("data:image/") && s.contain
 @Composable
 private fun ProductoCard(
     producto: Producto,
-    categorias: List<com.tiendavirtual.admin.productos.Categoria>,
+    categorias: List<Categoria>,
     onEditar: () -> Unit,
     onEliminar: () -> Unit
 ) {

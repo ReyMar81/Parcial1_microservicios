@@ -14,14 +14,6 @@ private val Purple40 = Color(0xFF663399)
 private val PurpleGrey40 = Color(0xFF7B1FA2)
 private val Pink40 = Color(0xFFAD1457)
 
-// Colores adicionales para la interfaz
-val GreenSuccess = Color(0xFF4CAF50)
-val RedError = Color(0xFFE53E3E)
-val OrangeWarning = Color(0xFFFF9800)
-val BlueInfo = Color(0xFF2196F3)
-val LightGray = Color(0xFFF5F5F5)
-val DarkGray = Color(0xFF424242)
-
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
