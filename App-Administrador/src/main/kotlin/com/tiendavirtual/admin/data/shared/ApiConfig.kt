@@ -6,7 +6,7 @@ package com.tiendavirtual.admin.data.shared
 object ApiConfig {
     // URL base del API Gateway
     //const val GATEWAY_BASE_URL = "http://10.0.2.2:8080/api/"  // Para emulador
-    const val GATEWAY_BASE_URL = "http://192.168.0.17:8080/api"
+    const val GATEWAY_BASE_URL = "http://192.168.0.15:8080/api"
     const val CLIENTES_URL = "${GATEWAY_BASE_URL}/clientes"
     private const val PRODUCTOS_PREFIX = "$GATEWAY_BASE_URL/productos"
     const val PRODUCTOS_URL = PRODUCTOS_PREFIX
