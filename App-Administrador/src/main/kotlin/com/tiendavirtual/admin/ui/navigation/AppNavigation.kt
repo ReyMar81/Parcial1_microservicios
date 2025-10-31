@@ -18,10 +18,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tiendavirtual.admin.ui.main.MainScreen
 import com.tiendavirtual.admin.presentation.clientes.ClientesScreen
-import com.tiendavirtual.admin.productos.CategoriasModerno
-import com.tiendavirtual.admin.productos.ProductosModerno
-import com.tiendavirtual.admin.productos.CatalogosScreen
-import com.tiendavirtual.admin.ventas.VentasModuleScreen
+import com.tiendavirtual.admin.presentation.categorias.CategoriasScreen
+import com.tiendavirtual.admin.presentation.productos.ProductosScreen
+import com.tiendavirtual.admin.presentation.catalogos.CatalogosScreen
+import com.tiendavirtual.admin.presentation.ventas.VentasScreen
 
 /**
  * Navegación
@@ -52,12 +52,12 @@ fun AppNavigation() {
 
         // Productos
         composable("productos") {
-            ProductosModerno()
+            ProductosScreen()
         }
 
         // Categorías
         composable("categorias") {
-            CategoriasModerno()
+            CategoriasScreen()
         }
 
         // Catálogos
@@ -65,9 +65,9 @@ fun AppNavigation() {
             CatalogosScreen()
         }
 
-        // Ventas - ahora funcional
+        // Ventas
         composable("ventas") {
-            VentasModuleScreen()
+            VentasScreen()
         }
     }
 }
