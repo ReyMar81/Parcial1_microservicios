@@ -6,4 +6,7 @@ data class Cliente(
     val docIdentidad: String,
     val whatsapp: String,
     val direccion: String
-)
+) {
+    // Alias para compatibilidad con VentasModule
+    val nombre: String get() = nombres
+}

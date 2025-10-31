@@ -34,6 +34,12 @@ fun LoadingCard(mensaje: String = "Cargando...") {
     }
 }
 
+// Sobrecarga con parámetro 'message' para compatibilidad
+@Composable
+fun LoadingCard(message: String = "Cargando...", modifier: Modifier = Modifier) {
+    LoadingCard(mensaje = message)
+}
+
 @Composable
 fun EmptyCard(
     titulo: String,
@@ -67,6 +73,31 @@ fun EmptyCard(
             )
             Text(
                 text = subtitulo,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// Sobrecarga con parámetro 'message' para compatibilidad
+@Composable
+fun EmptyCard(message: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -114,4 +145,10 @@ fun ErrorCard(
             }
         }
     }
+}
+
+// Sobrecarga con parámetro 'message' para compatibilidad
+@Composable
+fun ErrorCard(message: String, onRetry: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+    ErrorCard(mensaje = message, onRetry = onRetry)
 }

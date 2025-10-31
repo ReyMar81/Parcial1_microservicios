@@ -1,6 +1,7 @@
 package com.tiendavirtual.admin.domain.model
 
 data class Producto(
+    val id: Int? = null, // Agregado para compatibilidad
     val codigo: Int = 0,
     val nombre: String,
     val descripcion: String,
