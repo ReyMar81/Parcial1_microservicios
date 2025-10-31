@@ -5,14 +5,20 @@ package com.tiendavirtual.admin.data.shared
  */
 object ApiConfig {
     // URL base del API Gateway
-    //const val GATEWAY_BASE_URL = "http://10.0.2.2:8080/api/"  // Para emulador
+    //const val GATEWAY_BASE_URL = "http://10.0.2.2:8080/api"  // Para emulador
     const val GATEWAY_BASE_URL = "http://192.168.0.15:8080/api"
-    const val CLIENTES_URL = "${GATEWAY_BASE_URL}/clientes"
+    
+    // Microservicio Clientes
+    const val CLIENTES_URL = "$GATEWAY_BASE_URL/clientes"
+    
+    // Microservicio Productos (incluye categorías, productos y catálogos)
     private const val PRODUCTOS_PREFIX = "$GATEWAY_BASE_URL/productos"
-    const val PRODUCTOS_URL = PRODUCTOS_PREFIX
     const val CATEGORIAS_URL = "$PRODUCTOS_PREFIX/categorias"
-    const val CATALOGOS_URL  = "$PRODUCTOS_PREFIX/catalogos"
-    const val VENTAS_URL = "${GATEWAY_BASE_URL}/ventas"
+    const val PRODUCTOS_URL = "$PRODUCTOS_PREFIX/productos"
+    const val CATALOGOS_URL = "$PRODUCTOS_PREFIX/catalogos"
+    
+    // Microservicio Ventas
+    const val VENTAS_URL = "$GATEWAY_BASE_URL/ventas"
     const val CONFIRMAR_VENTA_URL = "$VENTAS_URL/{id}/confirmar"
     const val ANULAR_VENTA_URL = "$VENTAS_URL/{id}/anular"
 
