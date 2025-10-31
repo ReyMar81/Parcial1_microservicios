@@ -17,7 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tiendavirtual.admin.ui.main.MainScreen
-import com.tiendavirtual.admin.clientes.ClientesScreen
+import com.tiendavirtual.admin.presentation.clientes.ClientesScreen
 import com.tiendavirtual.admin.productos.CategoriasModerno
 import com.tiendavirtual.admin.productos.ProductosModerno
 import com.tiendavirtual.admin.productos.CatalogosScreen
